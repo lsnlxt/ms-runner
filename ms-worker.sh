@@ -95,13 +95,16 @@ fetch_queue() {
   local url="https://codeload.github.com/${BUS_OWNER}/${BUS_REPO}/tar.gz/refs/heads/${QUEUE_BRANCH}"
   local tmp="${WORK_ROOT}/bus.tar.gz"
   log "拉取队列：${BUS_OWNER}/${BUS_REPO}@${QUEUE_BRANCH}"
-  if ! curl -sL --max-time 60 -H "Authorization: Bearer ${GH_TOKEN}" -o "$tmp" "$url"; then
-    warn "codeload 拉取失败"
+  local http_code
+  http_code=$(curl -sL --max-time 60 -w '%{http_code}' -H "Authorization: Bearer ${GH_TOKEN}" -o "$tmp" "$url")
+  if [[ "$http_code" != "200" ]]; then
+    warn "队列 codeload 返回 HTTP ${http_code}：${BUS_OWNER}/${BUS_REPO}@${QUEUE_BRANCH}"
+    warn "  404 = 仓库不可见（私有且 token 无效/无权限）或分支不存在" 
     return 1
   fi
   # 空 tarball（分支不存在）时 codeload 返回 "Not Found" 文本，不是 gzip
   if ! tar tzf "$tmp" >/dev/null 2>&1; then
-    warn "队列分支不存在或 tarball 非法：${QUEUE_BRANCH}"
+    warn "队列 tarball 非 gzip（HTTP 200 但内容非法）：${QUEUE_BRANCH}"
     return 1
   fi
   rm -rf "$dest"; mkdir -p "$dest"
@@ -156,10 +159,15 @@ PY
   [[ -n "$tarball" ]] || { warn "job 缺 tarball_url"; return 1; }
   local tmp="${WORK_ROOT}/repo.tar.gz"
   log "拉任务仓库：${tarball}"
-  curl -sL --max-time 120 -H "Authorization: Bearer ${GH_TOKEN}" -o "$tmp" "$tarball" || return 1
+  local http_code
+  http_code=$(curl -sL --max-time 120 -w '%{http_code}' -H "Authorization: Bearer ${GH_TOKEN}" -o "$tmp" "$tarball")
+  if [[ "$http_code" != "200" ]]; then
+    warn "任务仓库 codeload 返回 HTTP ${http_code}：${tarball}"
+    return 1
+  fi
   # 404/无权限时 codeload 返回文本（非 gzip），必须显式校验，否则「看起来就绪、实则空仓库」。
   if ! tar tzf "$tmp" >/dev/null 2>&1; then
-    warn "任务仓库 tarball 非法（404 或 ref 不存在？）：${tarball}"
+    warn "任务仓库 tarball 非 gzip（HTTP 200 但内容非法）：${tarball}"
     return 1
   fi
   rm -rf "$dest"; mkdir -p "$dest"
