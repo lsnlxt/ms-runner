@@ -39,7 +39,7 @@ BUS_REPO="${BUS_REPO:-lidar-ai-bus}"
 ALERT_REPO="${ALERT_REPO:-${BUS_OWNER}/${BUS_REPO}}"   # 熔断告警落哪
 QUEUE_BRANCH="${QUEUE_BRANCH:-}"            # 默认 queue/<PROJECT>
 ONCE=0
-DRY_RUN=0                                    # 只拉不跑，验证拉取链路
+DRY_RUN=0                                    # 只拉不跑、不回传，验证拉取链路
 POLL_SECS="${POLL_SECS:-30}"                 # 常驻时轮询间隔
 WORK_ROOT="${WORK_ROOT:-/tmp/executor}"      # 工作根目录
 MAX_STEPS="${MAX_STEPS:-150}"
@@ -472,6 +472,11 @@ run_once() {
   claim_job "$bus" "$jid"
   CURRENT_JID="$jid"
   process_job "$bus" "$jid" || return 1
+  # dry-run 不得产生远端写操作：带有效 token 时会真的提交结果到队列分支
+  if (( DRY_RUN )); then
+    log "[dry-run] 跳过回传，结果只保留在本地"
+    return 0
+  fi
   # 回传（gh api 提交到队列分支）
   push_results || return 1
   return 0
