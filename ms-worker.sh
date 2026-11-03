@@ -98,9 +98,13 @@ fetch_queue() {
   log "拉取队列：${BUS_OWNER}/${BUS_REPO}@${QUEUE_BRANCH}"
   local http_code
   http_code=$(curl -sL --max-time 60 -w '%{http_code}' -H "Authorization: Bearer ${GH_TOKEN}" -o "$tmp" "$url")
+  if [[ "$http_code" != "200" && -n "${GH_TOKEN:-}" ]]; then
+    warn "带凭据请求返回 HTTP ${http_code}，改匿名重试"
+    http_code=$(curl -sL --max-time 60 -w '%{http_code}' -o "$tmp" "$url")
+  fi
   if [[ "$http_code" != "200" ]]; then
     warn "队列 codeload 返回 HTTP ${http_code}：${BUS_OWNER}/${BUS_REPO}@${QUEUE_BRANCH}"
-    warn "  404 = 仓库不可见（私有且 token 无效/无权限）或分支不存在" 
+    warn "  404 可能是：凭据无效（无效 token 连公开仓也会 404）、仓库私有且无权、或分支不存在"
     return 1
   fi
   # 空 tarball（分支不存在）时 codeload 返回 "Not Found" 文本，不是 gzip
@@ -162,6 +166,10 @@ PY
   log "拉任务仓库：${tarball}"
   local http_code
   http_code=$(curl -sL --max-time 120 -w '%{http_code}' -H "Authorization: Bearer ${GH_TOKEN}" -o "$tmp" "$tarball")
+  if [[ "$http_code" != "200" && -n "${GH_TOKEN:-}" ]]; then
+    warn "任务仓库带凭据请求返回 HTTP ${http_code}，改匿名重试"
+    http_code=$(curl -sL --max-time 120 -w '%{http_code}' -o "$tmp" "$tarball")
+  fi
   if [[ "$http_code" != "200" ]]; then
     warn "任务仓库 codeload 返回 HTTP ${http_code}：${tarball}"
     return 1
