@@ -1,0 +1,15 @@
+{
+  "job_id": "job-public-0001",
+  "project": "test",
+  "created_at": "2026-11-04T00:00:00Z",
+  "repo": {
+    "name": "Hello-World",
+    "owner": "octocat",
+    "ref": "master",
+    "tarball_url": "https://codeload.github.com/octocat/Hello-World/tar.gz/refs/heads/master"
+  },
+  "task": {"kind": "full-iteration", "prompt_file": "payload/iteration-prompt.md", "max_seconds": 60, "require_tests": false},
+  "env_hints": {"required": ["OPENROUTER_API_KEY", "GH_TOKEN"]},
+  "retry": {"max": 1, "attempt": 1},
+  "note": "Synthetic fixture for credential-free dry-run. Points at a public repo on purpose: the real queue points at private repos and needs a token."
+}
