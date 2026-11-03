@@ -25,7 +25,8 @@
 #   ./ms-worker.sh --project <名> --once      # 处理一个任务就退
 #   ./ms-worker.sh --project <名>             # 常驻循环（实例存活期内）
 #
-# 退出码：0=正常；1=配置/环境缺失；124=护栏触发；125=熔断停循环。
+# 退出码：0=正常；1=配置/环境缺失，或本轮失败（--once 下透传本轮 rc）；
+#         2=无任务可认领；124=护栏触发；125=熔断停循环。
 
 set -uo pipefail
 
@@ -488,7 +489,10 @@ if (( ONCE )); then
   run_once
   rc=$?
   finalize_round "$rc"
-  exit $?
+  frc=$?
+  (( frc == 125 )) && exit 125
+  (( rc == 2 )) && exit 0
+  exit "$rc"
 fi
 
 log "进入常驻循环（每 ${POLL_SECS}s 轮询，Ctrl-C 退出）"
