@@ -324,69 +324,76 @@ PY
 # 这里把这些文件作为 blob 加到队列分支的 out/job-<id>/ 下，创建 commit 并更新 ref。
 # 为什么不用 git push：ECS/执行端 ssh 身份可能混用（ECS ssh=lsnww，repo 属 lsnlxt），
 #   ssh push 对私有仓库报 "Repository not found"。gh api 走 HTTPS、身份明确。
+# ---- GitHub API（curl + JSON，不依赖 gh：MS 上根本没有 gh）----------------
+api() {
+  local method="$1" path="$2" body="${3:-}"
+  local -a cargs=(-sL -X "$method" -H "Accept: application/vnd.github+json")
+  [[ -n "${GH_TOKEN:-}" ]] && cargs+=(-H "Authorization: Bearer ${GH_TOKEN}")
+  if [[ -n "$body" ]]; then
+    cargs+=(-H "Content-Type: application/json" --data-binary "$body")
+  fi
+  curl "${cargs[@]}" "https://api.github.com/${path}"
+}
+
+# 从 JSON 里取点分路径，取不到就输出空串
+jget() {
+  python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+for k in sys.argv[1].split("."):
+    d = d[k]
+print("" if d is None else d)
+' "$1" 2>/dev/null
+}
+
 push_results() {
   local bus="${WORK_ROOT}/bus"
   local outdir="${bus}/queue/${PROJECT}/out"
   [[ -d "$outdir" ]] || { warn "无结果目录可回传：${outdir}"; return 1; }
+  [[ -n "${GH_TOKEN:-}" ]] || { warn "缺 GH_TOKEN，无法回传（结果保留在 ${outdir}）"; return 1; }
 
-  # 只收集实际存在的文件，避免给空文件建 blob
-  local -a file_paths=() file_blobs=()
+  local -a file_paths=()
   local f
   for f in result.json run.log diff.patch; do
-    if [[ -s "${outdir}/job-${CURRENT_JID}/${f}" ]]; then
-      file_paths+=("${f}")
-    fi
+    [[ -s "${outdir}/job-${CURRENT_JID}/${f}" ]] && file_paths+=("$f")
   done
   (( ${#file_paths[@]} > 0 )) || { warn "无结果文件可回传"; return 0; }
 
-  # 判断 gh 可用
-  if ! command -v gh >/dev/null 2>&1 && [[ -z "${GH_TOKEN:-}" ]]; then
-    warn "无 gh 且无 GH_TOKEN，无法回传（结果保留在 ${outdir}）"
-    return 1
-  fi
-
-  local api_args=()
-  command -v gh >/dev/null 2>&1 && api_args=(gh api) || api_args=(curl -sL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
-
-  # 当前队列分支 HEAD
+  local repo_api="repos/${BUS_OWNER}/${BUS_REPO}"
   local head_sha head_tree
-  head_sha=$( "${api_args[@]}" "repos/${BUS_OWNER}/${BUS_REPO}/git/ref/heads/${QUEUE_BRANCH}" 2>/dev/null \
-    | python3 -c "import json,sys; print(json.load(sys.stdin).get('object',{}).get('sha',''))" 2>/dev/null )
-  [[ -n "$head_sha" ]] || { warn "无法读取队列分支 HEAD：${QUEUE_BRANCH}"; return 1; }
-  head_tree=$( "${api_args[@]}" "repos/${BUS_OWNER}/${BUS_REPO}/git/commits/${head_sha}" 2>/dev/null \
-    | python3 -c "import json,sys; print(json.load(sys.stdin).get('tree',{}).get('sha',''))" 2>/dev/null )
+  head_sha=$(api GET "${repo_api}/git/ref/heads/${QUEUE_BRANCH}" | jget object.sha)
+  [[ -n "$head_sha" ]] || { warn "无法读取队列分支 HEAD：${QUEUE_BRANCH}（token 无效时 GitHub 常返回 404 而非 401）"; return 1; }
+  head_tree=$(api GET "${repo_api}/git/commits/${head_sha}" | jget tree.sha)
   [[ -n "$head_tree" ]] || { warn "无法读取队列分支 tree"; return 1; }
 
-  # 为每个结果文件建 blob，并构造 tree 更新
-  local tree_args=(-f base_tree="$head_tree")
-  local f blob
+  local entries="" blob body
   for f in "${file_paths[@]}"; do
-    blob=$( "${api_args[@]}" "repos/${BUS_OWNER}/${BUS_REPO}/git/blobs" \
-      -f content="$(cat "${outdir}/job-${CURRENT_JID}/${f}")" -f encoding=utf-8 2>/dev/null \
-      | python3 -c "import json,sys; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null )
+    body=$(python3 -c 'import json,sys
+print(json.dumps({"content": open(sys.argv[1], encoding="utf-8", errors="replace").read(), "encoding": "utf-8"}))' \
+      "${outdir}/job-${CURRENT_JID}/${f}")
+    blob=$(api POST "${repo_api}/git/blobs" "$body" | jget sha)
     [[ -n "$blob" ]] || { warn "建 blob 失败：${f}"; return 1; }
-    tree_args+=(
-      -f "tree[][path]=queue/${PROJECT}/out/job-${CURRENT_JID}/${f}"
-      -f "tree[][mode]=100644" -f "tree[][type]=blob" -f "tree[][sha]=${blob}"
-    )
+    entries="${entries}${entries:+,}{\"path\":\"queue/${PROJECT}/out/job-${CURRENT_JID}/${f}\",\"mode\":\"100644\",\"type\":\"blob\",\"sha\":\"${blob}\"}"
   done
 
   local new_tree
-  new_tree=$( "${api_args[@]}" "repos/${BUS_OWNER}/${BUS_REPO}/git/trees" "${tree_args[@]}" 2>/dev/null \
-    | python3 -c "import json,sys; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null )
+  new_tree=$(api POST "${repo_api}/git/trees" \
+    "{\"base_tree\":\"${head_tree}\",\"tree\":[${entries}]}" | jget sha)
   [[ -n "$new_tree" ]] || { warn "建 tree 失败"; return 1; }
 
+  local msg="executor: result ${CURRENT_JID} @ $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   local new_commit
-  new_commit=$( "${api_args[@]}" "repos/${BUS_OWNER}/${BUS_REPO}/git/commits" \
-    -f message="executor: result ${CURRENT_JID} @ $(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-    -f tree="$new_tree" -f "parents[]=$head_sha" 2>/dev/null \
-    | python3 -c "import json,sys; print(json.load(sys.stdin).get('sha',''))" 2>/dev/null )
+  new_commit=$(api POST "${repo_api}/git/commits" \
+    "$(python3 -c 'import json,sys
+print(json.dumps({"message": sys.argv[1], "tree": sys.argv[2], "parents": [sys.argv[3]]}))' \
+      "$msg" "$new_tree" "$head_sha")" | jget sha)
   [[ -n "$new_commit" ]] || { warn "建 commit 失败"; return 1; }
 
-  # 更新 ref（fast-forward；并发冲突时失败，符合预期）
-  # 注意：gh api 用 -F（literal）发布尔，-f 会把 false 当字符串发导致 422。
-  "${api_args[@]}" "repos/${BUS_OWNER}/${BUS_REPO}/git/refs/heads/${QUEUE_BRANCH}" \
-    -X PATCH -f sha="$new_commit" -F force=false >/dev/null 2>&1 \
+  api PATCH "${repo_api}/git/refs/heads/${QUEUE_BRANCH}" \
+    "{\"sha\":\"${new_commit}\",\"force\":false}" >/dev/null 2>&1 \
     && { log "结果已回传：${BUS_OWNER}/${BUS_REPO}@${QUEUE_BRANCH} out/job-${CURRENT_JID}"; return 0; } \
     || { warn "回传 ref 更新失败（并发冲突？），结果保留在 ${outdir}"; return 1; }
 }
