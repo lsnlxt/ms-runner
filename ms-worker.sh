@@ -201,6 +201,11 @@ run_guarded() {
   log "CODEX_HOME=${CODEX_HOME} sandbox=${SANDBOX} effort=${REASONING_EFFORT}"
 
   # Codex 免费模型断言（ECS adapter 原样保留）
+  # fail-closed：缺配置时无法确认模型档位，直接拒绝，避免 codex 落到默认（可能付费）模型
+  if [[ ! -f "${CODEX_HOME}/config.toml" && "${ALLOW_NONFREE_MODEL:-0}" != "1" ]]; then
+    warn "缺 ${CODEX_HOME}/config.toml，无法确认模型档位，拒绝执行（ALLOW_NONFREE_MODEL=1 可跳过）"
+    return 124
+  fi
   if [[ -f "${CODEX_HOME}/config.toml" ]]; then
     local m
     m=$(python3 - "${CODEX_HOME}/config.toml" <<'PY' 2>/dev/null || echo ""
