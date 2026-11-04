@@ -19,8 +19,8 @@ private queue.
 On a fresh notebook instance:
 
 ```
-curl -sL -o /tmp/run-ms.sh "https://codeload.github.com/lsnlxt/ms-runner/tar.gz/refs/heads/main" && \
-tar -xzf /tmp/run-ms.sh -C /tmp --strip-components=1 ms-runner-main/run-ms.sh && \
+curl -sL -o /tmp/ms-runner.tar.gz "https://codeload.github.com/lsnlxt/ms-runner/tar.gz/refs/heads/main" && \
+tar -xzf /tmp/ms-runner.tar.gz -C /tmp --strip-components=1 ms-runner-main/run-ms.sh && \
 bash /tmp/run-ms.sh
 ```
 
