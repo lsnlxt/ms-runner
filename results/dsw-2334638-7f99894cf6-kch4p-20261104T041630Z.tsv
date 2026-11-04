@@ -1,0 +1,16 @@
+laser-physics-core	2026-11-04T03:53:04Z	PASS
+lidar-ai-bus	2026-11-04T03:55:36Z	PASS
+lidar-atmosphere	2026-11-04T03:56:29Z	INSTALL_FAIL
+lidar-calibration	2026-11-04T03:58:23Z	PYTEST_FAIL_2
+lidar-cli	2026-11-04T04:00:26Z	PASS
+lidar-data-model	2026-11-04T04:00:26Z	FETCH_FAIL_404
+lidar-detectors	2026-11-04T04:01:36Z	INSTALL_FAIL
+lidar-geometry	2026-11-04T04:04:45Z	PASS
+lidar-inversion	2026-11-04T04:07:03Z	PASS
+lidar-signal-processing	2026-11-04T04:08:53Z	PASS
+lidar-sim-service	2026-11-04T04:10:52Z	PASS
+lidar-software-suite	2026-11-04T04:12:02Z	SKIP_NO_BUILD
+lidar-studio	2026-11-04T04:13:18Z	PYTEST_FAIL_2
+lidar-system-sim	2026-11-04T04:15:04Z	PASS
+lidar-techprep-2027	2026-11-04T04:15:05Z	SKIP_NO_BUILD
+flow-dashboard	2026-11-04T04:16:30Z	PASS
