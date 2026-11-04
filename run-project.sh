@@ -100,8 +100,22 @@ one() {
         fi
     fi
 
-    "$py" -m pip install -q -e . > "/tmp/${repo}.install.log" 2>&1
+    # 若声明了 dev / test extras，优先带上——测试依赖常放在那里
+    local extra=""
+    if grep -qE '^dev[[:space:]]*=[[:space:]]*\[' pyproject.toml 2>/dev/null; then
+        extra="[dev]"
+    elif grep -qE '^test[[:space:]]*=[[:space:]]*\[' pyproject.toml 2>/dev/null; then
+        extra="[test]"
+    fi
+
+    "$py" -m pip install -q -e ".${extra}" > "/tmp/${repo}.install.log" 2>&1
     rc=$?
+    if [[ $rc -ne 0 && -n "$extra" ]]; then
+        echo "   install with ${extra} failed, retrying plain"
+        extra=""
+        "$py" -m pip install -q -e . > "/tmp/${repo}.install.log" 2>&1
+        rc=$?
+    fi
     if [[ $rc -ne 0 ]]; then
         echo "   FAIL install (rc=$rc), last lines:"
         tail -4 "/tmp/${repo}.install.log" | sed 's/^/     /'
