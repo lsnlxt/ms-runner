@@ -9,12 +9,37 @@
 #   GH_TOKEN            read access to the private queue repo (lsnlxt/lidar-ai-bus)
 #   OPENROUTER_API_KEY  for the codex execution step
 #
+# Environment:
+#   MS_PROBE=1   also test PyPI reachability (adds up to 30s)
+#
 # Usage:
 #   bash run-ms.sh [WORK_ROOT]
 set -euo pipefail
 
 MIRROR="https://codeload.github.com/lsnlxt/ms-runner/tar.gz/refs/heads/main"
 WORK="${1:-/tmp/executor}"
+
+# 环境能力自报：决定哪些仓库能在这台实例上构建。
+# 便宜项总是跑；PyPI 连通性测试需要 MS_PROBE=1（最多多等 30 秒）。
+probe() {
+  echo "== environment =="
+  printf '  python : %s\n' "$(python3 -V 2>&1)"
+  printf '  cpu    : %s\n' "$(nproc 2>/dev/null || echo '?')"
+  printf '  mem    : %s\n' "$(awk '/MemTotal/{printf "%.1f GiB", $2/1048576}' /proc/meminfo 2>/dev/null || echo '?')"
+  printf '  cc     : %s\n' "$(gcc --version 2>/dev/null | head -1 || echo MISSING)"
+  printf '  pyinc  : %s\n' "$(python3-config --includes 2>/dev/null || echo MISSING)"
+  printf '  pip    : %s\n' "$(python3 -m pip --version 2>&1 | cut -d' ' -f1-2)"
+  if [[ "${MS_PROBE:-0}" == "1" ]]; then
+    printf '  pypi   : '
+    if timeout 30 python3 -m pip download --no-deps -q --dest /tmp/_pp cython >/dev/null 2>&1; then
+      echo reachable
+    else
+      echo UNREACHABLE
+    fi
+  fi
+}
+
+probe
 
 curl -sL -o /tmp/ms-runner.tar.gz "$MIRROR"
 tar -xzf /tmp/ms-runner.tar.gz -C /tmp --strip-components=1 ms-runner-main/ms-worker.sh
