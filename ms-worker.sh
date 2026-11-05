@@ -193,7 +193,7 @@ PY
 # 以子进程跑 agent，按 MAX_STEPS 之外的信号之一（反复同命令）近似护栏。
 # 完整 token/步数统计需 Codex 会话文件，这里保留结构，接入时按 supervise.sh 实现。
 run_guarded() {
-  local jobdir="$1" repo="$2" prompt="$3" outlog="$4"
+  local jobdir="$1" repo="$2" prompt="$3" outlog="$4" secs="${5:-1800}"
   local adapter_rc=0
   # 预清理 index.lock（ECS 事故：残留会让 Codex 陷入反复重试）
   [[ -f "$repo/.git/index.lock" ]] && rm -f "$repo/.git/index.lock"
@@ -224,7 +224,7 @@ PY
   fi
 
   # 真正跑 Codex（参数来自 ECS adapter-codex.sh）
-  ( cd "$repo" && codex exec \
+  ( cd "$repo" && timeout "$secs" codex exec \
       --sandbox "$SANDBOX" \
       --add-dir "$(dirname "$jobdir")" \
       -c "model_reasoning_effort=${REASONING_EFFORT}" \
@@ -269,7 +269,20 @@ process_job() {
   fi
 
   local rc=0
-  run_guarded "$work" "$repo" "$promptfile" "$runlog"
+  local max_secs="${MAX_SECONDS:-1800}"
+  local job_secs
+  job_secs=$(python3 - "$injob" <<'PY' 2>/dev/null || echo ""
+import json,sys
+try:
+    print(int(json.load(open(sys.argv[1],encoding="utf-8"))
+              .get("task",{}).get("max_seconds") or 0))
+except Exception:
+    pass
+PY
+)
+  [[ "${job_secs:-0}" =~ ^[0-9]+$ ]] && (( job_secs > 0 )) && max_secs="$job_secs"
+  log "预算：${max_secs}s（来源：job.json 或 MAX_SECONDS）"
+  run_guarded "$work" "$repo" "$promptfile" "$runlog" "$max_secs"
   rc=$?
 
   local status="SUCCESS"
