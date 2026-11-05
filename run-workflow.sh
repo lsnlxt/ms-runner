@@ -26,6 +26,26 @@ if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
     exit 2
 fi
 
+# codex 不是 ModelScope 镜像自带的，必须先确认；否则 worker 会在
+# timeout 里报 127 并记一条 FAILED，白跑一轮。
+if ! command -v codex >/dev/null 2>&1; then
+    echo "codex CLI not found on PATH" >&2
+    if command -v npm >/dev/null 2>&1; then
+        echo "installing @openai/codex via npm (one-off per instance)..." >&2
+        if ! npm install -g @openai/codex >/tmp/codex-install.log 2>&1; then
+            echo "npm install failed; see /tmp/codex-install.log" >&2
+            exit 3
+        fi
+    else
+        echo "npm not found either; Node.js is required" >&2
+        exit 3
+    fi
+fi
+if ! codex --version >/dev/null 2>&1; then
+    echo "codex exists but is not runnable" >&2
+    exit 3
+fi
+
 curl -sL -o /tmp/wf.tgz "$MIRROR"
 tar -xzf /tmp/wf.tgz -C /tmp --strip-components=1 \
     ms-runner-main/ms-worker.sh ms-runner-main/codex-config.toml
