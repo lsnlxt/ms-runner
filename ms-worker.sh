@@ -307,10 +307,19 @@ PY
     total=$(printf '%s\n' "$tlog" | grep -oE '[0-9]+ in ' | tail -1 | grep -oE '[0-9]+' || echo 0)
   fi
 
+  # 提交 codex 的改动，否则 head_after 永远等于 head_before，字段没有意义
+  ( cd "$repo" && git add -A && \
+    if git diff --cached --quiet; then
+      : # 空转，不建空提交
+    else
+      git -c user.email=executor@local -c user.name=executor \
+          commit -qm "executor: ${jid} (${status})"
+    fi ) 2>/dev/null || true
+
   local head_after; head_after=$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo "$head_before")
 
-  # 生成 diff.patch（可能为空 = 空转）
-  ( cd "$repo" && git add -A && git diff --cached > "${work}/diff.patch" ) 2>/dev/null || true
+  # diff.patch 取自提交后的历史；空转时为空
+  ( cd "$repo" && git diff "$head_before" HEAD > "${work}/diff.patch" ) 2>/dev/null || true
 
   # 回传日志（过滤后）
   cp "$runlog" "$outdir/run.log" 2>/dev/null || true
