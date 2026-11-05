@@ -1,7 +1,18 @@
-# Dry-run fixture prompt
+# Task
 
-This file exists only so `process_job` finds the prompt it requires.
+Create a new file named `GREETING.md` in the repository root.
 
-In a real run this is the iteration prompt handed to the executor. In `--dry-run`
-the executor is never invoked, so the content is irrelevant — its existence is
-what matters.
+It must contain exactly this single line:
+
+```
+hello from the executor
+```
+
+Rules:
+
+- Do not modify any other file.
+- Do not run tests.
+- As soon as the file exists with that content, stop.
+
+This is a smoke test of the executor pipeline: the goal is a verifiable diff,
+not a useful feature.
