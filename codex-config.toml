@@ -1,0 +1,26 @@
+# Codex configuration for the ModelScope worker.
+#
+# Install to ${CODEX_HOME}/config.toml (ms-worker.sh defaults CODEX_HOME to
+# ~/.codex-executor). The worker refuses to execute when this file is absent:
+# without it there is no way to prove the model is a free-tier one.
+#
+# wire_api MUST be "responses". Codex 0.152.x removed the "chat" wire API:
+#   Error loading config.toml: `wire_api = "chat"` is no longer supported.
+# OpenRouter does speak the responses protocol, so this works.
+#
+# Any model id ending in ":free" satisfies the worker's guard. Verified working:
+#   cohere/north-mini-code:free
+# Other free ids with tool support (query openrouter.ai/api/v1/models):
+#   nvidia/nemotron-3-ultra-550b-a55b:free
+#   google/gemma-4-31b-it:free
+#   recursive/flint-v1.0:free
+
+model = "cohere/north-mini-code:free"
+model_provider = "openrouter"
+model_reasoning_effort = "low"
+
+[model_providers.openrouter]
+name = "OpenRouter"
+base_url = "https://openrouter.ai/api/v1"
+env_key = "OPENROUTER_API_KEY"
+wire_api = "responses"
