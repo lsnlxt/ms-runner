@@ -224,7 +224,7 @@ PY
   fi
 
   # 真正跑 Codex（参数来自 ECS adapter-codex.sh）
-  ( cd "$repo" && timeout "$secs" codex exec \
+  ( cd "$repo" && timeout "$secs" env -u GH_TOKEN codex exec \
       --sandbox "$SANDBOX" \
       --add-dir "$(dirname "$jobdir")" \
       -c "model_reasoning_effort=${REASONING_EFFORT}" \
@@ -384,7 +384,7 @@ push_results() {
 
   local -a file_paths=()
   local f
-  for f in result.json run.log diff.patch; do
+  for f in result.json run.log diff.patch claim.json; do
     [[ -s "${outdir}/job-${CURRENT_JID}/${f}" ]] && file_paths+=("$f")
   done
   (( ${#file_paths[@]} > 0 )) || { warn "无结果文件可回传"; return 0; }
