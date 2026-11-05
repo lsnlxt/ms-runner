@@ -8,14 +8,18 @@
 #   Error loading config.toml: `wire_api = "chat"` is no longer supported.
 # OpenRouter does speak the responses protocol, so this works.
 #
-# Any model id ending in ":free" satisfies the worker's guard. Verified working:
-#   cohere/north-mini-code:free
-# Other free ids with tool support (query openrouter.ai/api/v1/models):
-#   nvidia/nemotron-3-ultra-550b-a55b:free
-#   google/gemma-4-31b-it:free
-#   recursive/flint-v1.0:free
+# Any model id ending in ":free" satisfies the worker's guard.
+#
+# Benchmarked on the same smoke task (create GREETING.md, one line):
+#   recursive/flint-v1.0:free        9,554 tokens  ~33s  correct
+#   cohere/north-mini-code:free     33,842 tokens   ~31s  correct
+# flint is the default for token efficiency; cohere is the fallback.
+# Other working ids: dots-studio/dots-3-note-preview:free
+# Known bad: nvidia/nemotron-3-lightning:free (upstream error),
+#            xingchen-agi/xing4.0-29b-a4b:free and google/gemma-4-31b-it:free
+#            (429 from upstream, not account quota)
 
-model = "cohere/north-mini-code:free"
+model = "recursive/flint-v1.0:free"
 model_provider = "openrouter"
 model_reasoning_effort = "low"
 
