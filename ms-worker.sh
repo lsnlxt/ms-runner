@@ -127,8 +127,19 @@ next_job() {
   for j in "$in_dir"/*/; do
     [[ -f "${j}job.json" ]] || continue
     local jid; jid=$(basename "$j")
-    # 已认领（out 里已有 claim）则跳过
-    [[ -f "${bus}/queue/${PROJECT}/out/job-${jid}/claim.json" ]] && continue
+    local out="${bus}/queue/${PROJECT}/out/job-${jid}"
+    # 有结果即完成；认领标记可能因为旧版本缺失
+    [[ -f "${out}/result.json" ]] && continue
+    if [[ -f "${out}/claim.json" ]]; then
+      # 有结果 = 已完成，跳过
+      [[ -f "${out}/result.json" ]] && continue
+      # 只有认领没有结果：可能是被实例闲置停机腰斩。超过租约则允许重跑。
+      if [[ -n "$(find "${out}/claim.json" -mmin +"${CLAIM_TTL_MIN:-30}" 2>/dev/null)" ]]; then
+        warn "租约超时且无结果，重新认领：${jid}"
+      else
+        continue
+      fi
+    fi
     printf "%s" "$jid"
     return 0
   done
@@ -269,7 +280,7 @@ process_job() {
   fi
 
   local rc=0
-  local max_secs="${MAX_SECONDS:-1800}"
+  local max_secs="${MAX_SECONDS:-1200}"
   local job_secs
   job_secs=$(python3 - "$injob" <<'PY' 2>/dev/null || echo ""
 import json,sys
