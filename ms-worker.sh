@@ -48,7 +48,7 @@ MAX_REPEAT="${MAX_REPEAT:-12}"
 MAX_CONSECUTIVE_FAILURES="${MAX_CONSECUTIVE_FAILURES:-3}"
 REASONING_EFFORT="${REASONING_EFFORT:-low}"
 SANDBOX="${SANDBOX:-workspace-write}"
-CODEX_HOME="${CODEX_HOME:-$HOME/.codex-executor}"
+export CODEX_HOME="${CODEX_HOME:-$HOME/.codex-executor}"
 
 # 当前正在处理的 job_id（run_once 设置，push_results 读取）
 CURRENT_JID=""
