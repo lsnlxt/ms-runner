@@ -73,9 +73,13 @@ QUEUE_BRANCH="${QUEUE_BRANCH:-queue/${PROJECT}}"
 # ---- 环境校验（key 只校验存在性，绝不打印值）----------------------------
 check_env() {
   local missing=()
-  for v in GH_TOKEN OPENROUTER_API_KEY; do
+  for v in GH_TOKEN; do
     if [[ -z "${!v:-}" ]]; then missing+=("$v"); fi
   done
+  # 执行模型的凭据：OpenRouter 或 ModelScope，有一个即可
+  if [[ -z "${OPENROUTER_API_KEY:-}" && -z "${MODELSCOPE_API_KEY:-}" ]]; then
+    missing+=("OPENROUTER_API_KEY|MODELSCOPE_API_KEY")
+  fi
   if (( ${#missing[@]} > 0 )); then
     die "缺少环境变量（请先 export，值不要贴进聊天）：${missing[*]}"
   fi
