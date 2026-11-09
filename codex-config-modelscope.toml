@@ -1,4 +1,4 @@
-model = "Qwen/Qwen3.5-27B"
+model = "ZhipuAI/GLM-5.2"
 model_provider = "modelscope"
 model_reasoning_effort = "low"
 
@@ -7,3 +7,13 @@ name = "ModelScope"
 base_url = "https://api-inference.modelscope.cn/v1"
 env_key = "MODELSCOPE_API_KEY"
 wire_api = "responses"
+
+# Model choice notes (all verified reachable through /v1/messages with tool_use):
+#   ZhipuAI/GLM-5.2                    1.8s  thinking + tool_use
+#   deepseek-ai/DeepSeek-V4-Pro-0813   2.2s  thinking + tool_use
+#   deepseek-ai/DeepSeek-V4.1-Flash-1017 2.3s text + tool_use
+#   Qwen/Qwen3.8-Flash-Next            1.4s  thinking + tool_use (fastest)
+#
+# Qwen/Qwen3.5-27B is fast but proved unreliable at applying edits: it failed
+# apply_patch and then ran out of budget retrying. Prefer GLM-5.2 for work that
+# must actually write files.
