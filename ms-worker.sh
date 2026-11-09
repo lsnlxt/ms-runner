@@ -234,7 +234,7 @@ try:
 except Exception: pass
 PY
 )
-    if [[ -n "$m" && "$m" != *:free ]]; then
+    if [[ -n "$m" && "$m" != *:free && "${ALLOW_NONFREE_MODEL:-0}" != "1" ]]; then
       warn "配置模型非免费档（${m}），拒绝执行"
       return 124
     fi
