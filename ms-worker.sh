@@ -512,6 +512,7 @@ run_once() {
   fetch_queue "$bus" || return 1
   local jid; jid=$(next_job "$bus")
   if [[ -z "$jid" ]]; then
+    log "无待办任务"
     return 2
   fi
   claim_job "$bus" "$jid"
