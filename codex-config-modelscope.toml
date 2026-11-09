@@ -1,0 +1,9 @@
+model = "Qwen/Qwen3.5-27B"
+model_provider = "modelscope"
+model_reasoning_effort = "low"
+
+[model_providers.modelscope]
+name = "ModelScope"
+base_url = "https://api-inference.modelscope.cn/v1"
+env_key = "MODELSCOPE_API_KEY"
+wire_api = "responses"
