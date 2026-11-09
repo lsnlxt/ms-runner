@@ -128,6 +128,8 @@ next_job() {
     [[ -f "${j}job.json" ]] || continue
     local jid; jid=$(basename "$j")
     local out="${bus}/queue/${PROJECT}/out/job-${jid}"
+    # 本批次已处理过的任务不再认领：codeload 可能仍返回推送前的缓存
+    [[ " ${SKIP_JOBS:-} " == *" ${jid} "* ]] && continue
     # 有结果即完成；认领标记可能因为旧版本缺失
     [[ -f "${out}/result.json" ]] && continue
     if [[ -f "${out}/claim.json" ]]; then
