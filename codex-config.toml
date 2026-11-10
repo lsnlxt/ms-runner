@@ -2,24 +2,26 @@
 #
 # Install to ${CODEX_HOME}/config.toml (ms-worker.sh defaults CODEX_HOME to
 # ~/.codex-executor). The worker refuses to execute when this file is absent:
-# without it there is no way to prove the model is a free-tier one.
+# without it there is no way to prove which model is being used.
 #
-# wire_api MUST be "responses". Codex 0.152.x removed the "chat" wire API:
-#   Error loading config.toml: `wire_api = "chat"` is no longer supported.
-# OpenRouter does speak the responses protocol, so this works.
+# wire_api MUST be "responses". Codex 0.152+ removed the "chat" wire API.
 #
-# Any model id ending in ":free" satisfies the worker's guard.
+# Model choice: openai/gpt-5-mini via OpenRouter.
+#   - same family as codex itself, so the tool protocol (apply_patch and friends)
+#     is understood without coaxing
+#   - $0.25/M input, $2.00/M output -> roughly $0.03 per job
 #
-# Benchmarked on the same smoke task (create GREETING.md, one line):
-#   recursive/flint-v1.0:free        9,554 tokens  ~33s  correct
-#   cohere/north-mini-code:free     33,842 tokens   ~31s  correct
-# flint is the default for token efficiency; cohere is the fallback.
-# Other working ids: dots-studio/dots-3-note-preview:free
-# Known bad: nvidia/nemotron-3-lightning:free (upstream error),
-#            xingchen-agi/xing4.0-29b-a4b:free and google/gemma-4-31b-it:free
-#            (429 from upstream, not account quota)
+# This is a PAID model. The free-tier models were tried and all failed at the
+# editing step:
+#   recursive/flint-v1.0:free    worked, but OpenRouter 429s after ~16 jobs
+#   Qwen/Qwen3.5-27B (ModelScope) completes, but apply_patch "does not exist"
+#                                 and it narrates the fallback instead of running it
+#   ZhipuAI/GLM-5.2 (ModelScope)  stream closed before response.completed
+#
+# Because the model id does not end in :free, the worker's guard requires
+# ALLOW_NONFREE_MODEL=1. That is intentional here: we are paying on purpose.
 
-model = "recursive/flint-v1.0:free"
+model = "openai/gpt-5-mini"
 model_provider = "openrouter"
 model_reasoning_effort = "low"
 
