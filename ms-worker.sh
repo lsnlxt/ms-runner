@@ -272,9 +272,22 @@ process_job() {
   local promptfile="${bus}/queue/${PROJECT}/in/${jid}/payload/iteration-prompt.md"
 
   mkdir -p "$outdir" "$work"
-  [[ -f "$promptfile" ]] || { warn "缺 prompt：${promptfile}"; return 1; }
 
-  fetch_repo "$injob" "$repo" || { warn "拉仓库失败"; return 1; }
+  # 早期失败也必须落一条结果，否则任务会永久停在 pending：
+  # 每轮被重新认领、每次都白花一次模型调用。
+  if [[ ! -f "$promptfile" ]]; then
+    warn "缺 prompt：${promptfile}"
+    printf '{"job_id":"%s","status":"FAILED","summary":"missing prompt file","exit_code":3,"finished_at":"%s"}\n' \
+      "$jid" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${outdir}/result.json"
+    return 0
+  fi
+
+  if ! fetch_repo "$injob" "$repo"; then
+    warn "拉仓库失败（ref 写错或无权访问？）"
+    printf '{"job_id":"%s","status":"FAILED","summary":"repo fetch failed","exit_code":3,"finished_at":"%s"}\n' \
+      "$jid" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${outdir}/result.json"
+    return 0
+  fi
 
   local head_before; head_before=$(git -C "$repo" rev-parse HEAD 2>/dev/null || echo "")
 
